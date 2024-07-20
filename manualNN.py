@@ -44,20 +44,4 @@ with torch.no_grad():
             print(f"{i:7d}/{max_step:7d}: {loss.item():.4f}")
         lossi.append(loss.log10().item())
 
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
+# TODO Adam
