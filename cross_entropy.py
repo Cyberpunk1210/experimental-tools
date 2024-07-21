@@ -17,4 +17,6 @@ class CrossEntropy(nn.Module):
         return loss
 
 # loss = F.cross_entropy(inputs, target)
-
+# dlogits = F.softmax(logits, 1)
+# dlogits[range(n), Yb] -= 1
+# dlogits /= n
