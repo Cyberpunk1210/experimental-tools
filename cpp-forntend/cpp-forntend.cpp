@@ -16,8 +16,9 @@ int main()
 {
     Net net(4, 5);
     net.to(torch::kCUDA);
-    for (const auto& p : net.parameters()){
-        std::cout << p << std::endl;
-    }
+    // for (const auto& pair : net.named_parameters()){
+    //     std::cout << pair.key() << ": " << pair.value() << std::endl;
+    // }
+    std::cout << net.forward(torch::ones({2, 4}).to(torch::kCUDA)) << std::endl;
     return 0;
 }
