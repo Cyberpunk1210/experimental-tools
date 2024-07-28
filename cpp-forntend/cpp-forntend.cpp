@@ -2,20 +2,20 @@
 #include <torch/torch.h>
 
 struct Net: torch::nn::Module{
-    Net(int64_t N, int64_t M){
-        W = register_parameter("W", torch::randn({N, M}));
-        b = register_parameter("b", torch::randn(M));
+    Net(int64_t N, int64_t M): linear(register_module("linear", torch::nn::Linear(N, M))){
+        another_bias = register_parameter("b", torch::randn(M));
     }
-
     torch::Tensor forward(torch::Tensor input){
-        return torch::addmm(b, input, W);
+        return linear(input) + another_bias;
     }
-    torch::Tensor W, b;
+    torch::nn::Linear linear;
+    torch::Tensor another_bias;
 };
 
 int main()
 {
     Net net(4, 5);
+    net.to(torch::kCUDA);
     for (const auto& p : net.parameters()){
         std::cout << p << std::endl;
     }
