@@ -1,0 +1,12 @@
+*.o
+*.so*
+*/*.pyc
+*/*.so*
+*/**/__pycache__
+*/**/*.pyc
+
+env
+
+
+
+build
