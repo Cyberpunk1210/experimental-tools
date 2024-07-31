@@ -115,6 +115,27 @@ void IndexMap(Map& m){
   std::cout << "}\n";
 }
 
+at::Tensor build_dataset(std::vector<std::string> words, std::map stoi){
+  std::vector<int> X;
+  std::vector<int> Y;
+  for (std::string w : words){
+    std::vector context;
+    context.resize(BATCHSIZE);
+    w += ".";
+    for (char ch : w){
+      std::vector<int> ix = stoi.find(ch);
+      X.push_back(context);
+      Y.push_back(ix);
+    }
+  }
+  at::TensorOptions opts = at::TensorOptions().dtype(at::kInt);
+  c10::IntArrayRef xsize = {1, 3};
+  c10::IntArrayRef ysize = {1};
+  at::Tensor TensorX = at::from_blob(X.data(), xsize, opts).clone();
+  at::Tensor TensorY = at::from_blob(Y.data(), ysize, opts).clone();
+  return TensorX, TensorY;
+}
+
 int main(){
   std::string filename = "names.txt";
   std::fstream myfile;
