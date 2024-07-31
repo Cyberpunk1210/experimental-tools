@@ -101,16 +101,10 @@
 
 #define BLOCKSIZE 3
 #define BATCHSIZE 64
-#define FILEPATH "names.txt"
 
 
-
-// std::vector build_dataset(words){
-//   std::vector X, Y;
-//   for ()
-// }
 int main(){
-  std::string filename = "name.txt";
+  std::string filename = "names.txt";
   std::fstream myfile;
 
   myfile.open("../" + filename);
@@ -125,8 +119,30 @@ int main(){
 
     myfile.close();
   }
-  std::cout <<"\nVector elements are: " << std::endl;
-  for (int i=0; i<words.size(); i++)
-    std::cout << words[i] << std::endl;
+
+  std::vector<int> maxLen;
+  std::vector<int>::iterator result;
+  for (int i=0; i<words.size(); i++){
+    int lens = words[i].size();
+    maxLen.push_back(lens);
+  }
+  result = std::max_element(maxLen.begin(), maxLen.end()); // printf the max length
+
+  std::cout << "words lens: " << words.size() << std::endl;
+  std::cout << "The max length is: " << *result << std::endl;
+  std::cout << "The first eight elements are: " << std::endl;
+  for (int i=0; i<8; i++){
+    std::cout << words[i] << "\t" << std::endl;
+  }
+
+  std::vector<std::string> allcombing_string;
+  std::string combing_string = std::accumulate(words.begin(), words.end(), std::string(""));
+  allcombing_string.push_back(combing_string);
+  // std::set<std::string>duplicate_string(combing_string.begin(), combing_string.end());
+  // combing_string.assign(duplicate_strin.begin(), duplicate_string.end());
+  // for(int x: combing_string)
+  //   std::cout << x << std::endl;
+  // std::sort(combing_string.begin(), combing_string.end());
+
   return 0;
 }
