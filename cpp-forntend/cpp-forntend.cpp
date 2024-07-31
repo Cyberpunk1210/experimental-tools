@@ -3,6 +3,8 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <algorithm>
+#include <map>
 #include <torch/torch.h>
 #include <ATen/ATen.h>
 #include <torch/extension.h>
@@ -102,6 +104,16 @@
 #define BLOCKSIZE 3
 #define BATCHSIZE 64
 
+bool compare(std::string a, std::string b){ return a < b;}
+
+template <typename Map>
+void IndexMap(Map& m){
+  std::cout << "{" ;
+  for (auto& item : m){
+    std::cout << item.first << ":" << item.second << " ";
+  }
+  std::cout << "}\n";
+}
 
 int main(){
   std::string filename = "names.txt";
@@ -130,19 +142,26 @@ int main(){
 
   std::cout << "words lens: " << words.size() << std::endl;
   std::cout << "The max length is: " << *result << std::endl;
-  std::cout << "The first eight elements are: " << std::endl;
+  std::cout << "The first eight elements are: ";
   for (int i=0; i<8; i++){
-    std::cout << words[i] << "\t" << std::endl;
+    std::cout << words[i] << " " << std::endl;
   }
 
-  std::vector<std::string> allcombing_string;
+  std::vector<std::string> all_string;
+  std::vector<char> sorted_string;
   std::string combing_string = std::accumulate(words.begin(), words.end(), std::string(""));
-  allcombing_string.push_back(combing_string);
-  // std::set<std::string>duplicate_string(combing_string.begin(), combing_string.end());
-  // combing_string.assign(duplicate_strin.begin(), duplicate_string.end());
-  // for(int x: combing_string)
-  //   std::cout << x << std::endl;
-  // std::sort(combing_string.begin(), combing_string.end());
+  std::sort(combing_string.begin(), combing_string.end(), [](char x, char y) {return x < y; });
+  combing_string.erase(std::unique(combing_string.begin(), combing_string.end()), combing_string.end());
+  combing_string += ".";
+  
+  for (int i=0; i<combing_string.size(); i++)
+    sorted_string.push_back(combing_string[i]);
 
+  std::map<int, char> itos;
+  for (int i=0; i<sorted_string.size(); i++)
+    itos[i+1] = sorted_string[i];
+  std::cout << "itos: ";
+  IndexMap(itos);
+  std::cout << sorted_string.size() << std::endl;
   return 0;
 }
