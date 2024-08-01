@@ -1,3 +1,5 @@
+#include "utils.h"
+
 #include <iostream>
 #include <vector>
 #include <fstream>
@@ -5,6 +7,7 @@
 #include <string>
 #include <algorithm>
 #include <map>
+#include <random>
 #include <torch/torch.h>
 #include <ATen/ATen.h>
 #include <torch/extension.h>
@@ -101,40 +104,10 @@
 // }
 
 
-#define BLOCKSIZE 3
 #define BATCHSIZE 64
 
-bool compare(std::string a, std::string b){ return a < b;}
 
-template <typename Map>
-void IndexMap(Map& m){
-  std::cout << "{" ;
-  for (auto& item : m){
-    std::cout << item.first << ":" << item.second << " ";
-  }
-  std::cout << "}\n";
-}
 
-at::Tensor build_dataset(std::vector<std::string> words, std::map stoi){
-  std::vector<int> X;
-  std::vector<int> Y;
-  for (std::string w : words){
-    std::vector context;
-    context.resize(BATCHSIZE);
-    w += ".";
-    for (char ch : w){
-      std::vector<int> ix = stoi.find(ch);
-      X.push_back(context);
-      Y.push_back(ix);
-    }
-  }
-  at::TensorOptions opts = at::TensorOptions().dtype(at::kInt);
-  c10::IntArrayRef xsize = {1, 3};
-  c10::IntArrayRef ysize = {1};
-  at::Tensor TensorX = at::from_blob(X.data(), xsize, opts).clone();
-  at::Tensor TensorY = at::from_blob(Y.data(), ysize, opts).clone();
-  return TensorX, TensorY;
-}
 
 int main(){
   std::string filename = "names.txt";
@@ -173,16 +146,45 @@ int main(){
   std::string combing_string = std::accumulate(words.begin(), words.end(), std::string(""));
   std::sort(combing_string.begin(), combing_string.end(), [](char x, char y) {return x < y; });
   combing_string.erase(std::unique(combing_string.begin(), combing_string.end()), combing_string.end());
-  combing_string += ".";
-  
+
   for (int i=0; i<combing_string.size(); i++)
     sorted_string.push_back(combing_string[i]);
 
   std::map<int, char> itos;
+  std::map<char, int> stoi;
   for (int i=0; i<sorted_string.size(); i++)
+  {
     itos[i+1] = sorted_string[i];
+    stoi[sorted_string[i]] = i+1;
+  }
+  stoi.insert(std::map<char, int>::value_type('.', 0));
+  itos.insert(std::map<int, char>::value_type(0, '.'));
+
   std::cout << "itos: ";
   IndexMap(itos);
-  std::cout << sorted_string.size() << std::endl;
+  std::cout << "stoi: " ;
+  IndexMap(stoi);
+  std::cout << sorted_string.size() + 1 << std::endl;
+
+  torch::manual_seed(42);
+  std::random_device rd;
+  std::mt19937 rng(rd());
+  std::shuffle(words.begin(),words.end(), rng);
+  int first_rate = words.size() * 0.8;
+  int second_rate = words.size() * 0.9;
+  // std::cout << first_rate << " " << second_rate << std::endl; 25626 28829
+  // std::cout << words.size() << std::endl; 32033
+  // std::cout << three vector size; 25626 3203 3204
+  torch::Tensor Xtr, Ytr, Xdev, Ydev, Xte, Yte;
+  std::vector<std::string> trwords, devwords, tewords;
+  trwords = slice(words, 0, first_rate);
+  devwords = slice(words, first_rate, second_rate);
+  tewords = slice(words, second_rate, words.size());
+
+  buildDataset(trwords, stoi, Xtr, Ytr);
+  buildDataset(devwords, stoi, Xdev, Ydev);
+  buildDataset(tewords, stoi, Xte, Yte);
+
+  std::cout << "vocab_size: " << itos.size() << std::endl;
   return 0;
 }
