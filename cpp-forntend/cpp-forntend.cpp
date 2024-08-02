@@ -8,11 +8,12 @@
 #include <algorithm>
 #include <map>
 #include <random>
+#include <cmath>
 #include <torch/torch.h>
 #include <ATen/ATen.h>
 #include <torch/extension.h>
 
-// int batch_size = 32;
+#define BATCH 32
 // typedef at::BFloat16 bf16;
 
 // std::vector<at::Tensor> gpttoy_forward(
@@ -104,11 +105,6 @@
 // }
 
 
-#define BATCHSIZE 64
-
-
-
-
 int main(){
   std::string filename = "names.txt";
   std::fstream myfile;
@@ -150,15 +146,15 @@ int main(){
   for (int i=0; i<combing_string.size(); i++)
     sorted_string.push_back(combing_string[i]);
 
-  std::map<int, char> itos;
-  std::map<char, int> stoi;
+  std::map<int32_t, char> itos;
+  std::map<char, int32_t> stoi;
   for (int i=0; i<sorted_string.size(); i++)
   {
     itos[i+1] = sorted_string[i];
     stoi[sorted_string[i]] = i+1;
   }
-  stoi.insert(std::map<char, int>::value_type('.', 0));
-  itos.insert(std::map<int, char>::value_type(0, '.'));
+  stoi.insert(std::map<char, int32_t>::value_type('.', 0));
+  itos.insert(std::map<int32_t, char>::value_type(0, '.'));
 
   std::cout << "itos: ";
   IndexMap(itos);
@@ -166,10 +162,10 @@ int main(){
   IndexMap(stoi);
   std::cout << sorted_string.size() + 1 << std::endl;
 
-  torch::manual_seed(42);
+  torch::manual_seed(2147483647);
   std::random_device rd;
   std::mt19937 rng(rd());
-  std::shuffle(words.begin(),words.end(), rng);
+  std::shuffle(words.begin(), words.end(), rng);
   int first_rate = words.size() * 0.8;
   int second_rate = words.size() * 0.9;
   // std::cout << first_rate << " " << second_rate << std::endl; 25626 28829
@@ -186,5 +182,50 @@ int main(){
   buildDataset(tewords, stoi, Xte, Yte);
 
   std::cout << "vocab_size: " << itos.size() << std::endl;
+  std::cout << Xtr << " ";
+  std::cout << Xtr.sizes() << std::endl;
+  // std::cout << Ytr << std::endl;
+  int vocab_size = itos.size();
+
+  int n_embd=10, n_hidden=64, emblock=BLOCK*10;
+  std::vector<at::Tensor> parameters;
+  auto C = torch::randn({vocab_size, n_embd});
+  parameters.push_back(C);
+
+  // layer 1
+  auto weight1 = torch::randn({emblock, n_hidden});
+  weight1 = weight1 * (5/3)/(std::pow(emblock, 0.5));
+  parameters.push_back(weight1);
+  auto bias1 = torch::randn({n_hidden});
+  bias1 = bias1 * 0.1;
+  parameters.push_back(bias1);
+
+  // layer 2
+  auto weight2 = torch::randn({n_hidden, vocab_size});
+  weight2 = weight2 * 0.1;
+  parameters.push_back(weight2);
+  auto bias2 = torch::randn({vocab_size});
+  bias2 = bias2 * 0.1;
+  parameters.push_back(bias2);
+
+  auto bngain = torch::randn({1, n_hidden});
+  bngain = bngain * 0.1 + 1.0;
+  parameters.push_back(bngain);
+  auto bnbias = torch::randn({1, n_hidden});
+  bnbias = bnbias * 0.1;
+  parameters.push_back(bnbias);
+
+  for (auto &x : parameters)
+    x.requires_grad();
+
+  // auto ix = torch::randint(0, Xtr.sizes()[0], {BATCH});
+
+  // auto Xb = Xtr.index({ix});
+  // auto Yb = Ytr.index({ix});
+
+  // auto emb = C.index({Xb});
+  // std::cout << emb << std::endl;
+  // auto embcat = emb.view({emb.sizes()[0], -1});
+
   return 0;
 }
