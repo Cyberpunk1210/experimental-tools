@@ -28,6 +28,32 @@ std::vector<T> slice(std::vector<T> const &v, int m, int n){
   return vec;
 }
 
+
+// class Range_iterator{
+//   public:
+//     Range_iterator(std::size_t c) : count(c) {}
+//     ~Range_iterator() = default;
+
+//     Range_iterator &operator++() {++count; return *this;}
+//     bool operator!=(const Range_iterator &ri) {return count != ri.count;}
+//     std::size_t &operator*() {return count;}
+//   private:
+//     std::size_t count;
+// }
+
+// class Range{
+//   public:
+//     Range(std::size_t b, std::size_t e) : Begin(b), End(e) {if(b>e) Begin = End;}
+//     Range(std::size_t e) : Range(0, e) {}
+//     ~Range = default;
+
+//     Range_iterator begin() {return Range_iterator(Begin);}
+//     Range_iterator end() {return Range_iterator(End);}
+//   private:
+//     std::size_t Begin;
+//     std::sizt_t End;
+// }
+
 template <typename Map>
 void buildDataset(const std::vector<std::string> words, const Map& stoi, torch::Tensor & X, torch::Tensor & Y, int col)
 {

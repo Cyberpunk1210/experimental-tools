@@ -168,6 +168,16 @@ int main(){
   auto counts_sum_inv = counts_sum.pow(-1);
   auto probs = counts * counts_sum_inv;
   auto logprobs = probs.log();
+  int nprobs[n];
+  #pragma unroll
+  for (int i=0; i<n; i++)
+    nprobs[i] = i+1;
+  auto rangen = torch::from_blob(nprobs, {n}, torch::kInt32);
+  // auto loss = -logprobs.index({rangen});
+
+  std::cout << rangen.sizes();
+  // for (auto &p : parameters)
+  //   p.grad = NULL;
 
 
 
