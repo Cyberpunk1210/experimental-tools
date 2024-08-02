@@ -146,15 +146,15 @@ int main(){
   for (int i=0; i<combing_string.size(); i++)
     sorted_string.push_back(combing_string[i]);
 
-  std::map<int32_t, char> itos;
-  std::map<char, int32_t> stoi;
+  std::map<int, char> itos;
+  std::map<char, int> stoi;
   for (int i=0; i<sorted_string.size(); i++)
   {
     itos[i+1] = sorted_string[i];
     stoi[sorted_string[i]] = i+1;
   }
-  stoi.insert(std::map<char, int32_t>::value_type('.', 0));
-  itos.insert(std::map<int32_t, char>::value_type(0, '.'));
+  stoi.insert(std::map<char, int>::value_type('.', 0));
+  itos.insert(std::map<int, char>::value_type(0, '.'));
 
   std::cout << "itos: ";
   IndexMap(itos);
@@ -177,14 +177,12 @@ int main(){
   devwords = slice(words, first_rate, second_rate);
   tewords = slice(words, second_rate, words.size());
 
-  buildDataset(trwords, stoi, Xtr, Ytr);
-  buildDataset(devwords, stoi, Xdev, Ydev);
-  buildDataset(tewords, stoi, Xte, Yte);
+  buildDataset(trwords, stoi, Xtr, Ytr, BLOCK);
+  buildDataset(devwords, stoi, Xdev, Ydev, BLOCK);
+  buildDataset(tewords, stoi, Xte, Yte, BLOCK);
 
   std::cout << "vocab_size: " << itos.size() << std::endl;
-  std::cout << Xtr << " ";
   std::cout << Xtr.sizes() << std::endl;
-  // std::cout << Ytr << std::endl;
   int vocab_size = itos.size();
 
   int n_embd=10, n_hidden=64, emblock=BLOCK*10;
@@ -218,14 +216,13 @@ int main(){
   for (auto &x : parameters)
     x.requires_grad();
 
-  // auto ix = torch::randint(0, Xtr.sizes()[0], {BATCH});
+  auto ix = torch::randint(0, Xtr.sizes()[0], {BATCH});
 
-  // auto Xb = Xtr.index({ix});
-  // auto Yb = Ytr.index({ix});
+  auto Xb = Xtr.index({ix});
+  auto Yb = Ytr.index({ix});
 
-  // auto emb = C.index({Xb});
-  // std::cout << emb << std::endl;
-  // auto embcat = emb.view({emb.sizes()[0], -1});
+  auto emb = C.index({Xb});
+  auto embcat = emb.view({emb.sizes()[0], -1});
 
   return 0;
 }

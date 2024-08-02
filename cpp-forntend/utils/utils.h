@@ -3,9 +3,9 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <fstream>
 #include <torch/torch.h>
 #include <ATen/ATen.h>
-#include <memory>
 
 #define BLOCK 3
 
@@ -22,31 +22,32 @@ void IndexMap(Map& m){
 
 template <typename T>
 std::vector<T> slice(std::vector<T> const &v, int m, int n){
-  auto first = v.cbegin() + m;
-  auto last = v.cbegin() + n;
+  auto first = v.begin() + m;
+  auto last = v.begin() + n;
   std::vector<T> vec(first, last);
   return vec;
 }
 
 template <typename Map>
-void buildDataset(const std::vector<std::string> words, const Map& stoi, torch::Tensor & X, torch::Tensor & Y)
+void buildDataset(const std::vector<std::string> words, const Map& stoi, torch::Tensor & X, torch::Tensor & Y, int col)
 {
-  std::vector<std::vector<int32_t>> tensorx;
-  std::vector<int32_t> tensory;
-  // auto options = torch::TensorOptions().dtype(torch::kLong);
+  int xraw = words.size();
+  std::vector<int> tensorx;
+  std::vector<int> tensory;
+  auto opts = torch::TensorOptions().dtype(torch::kInt32);
+  std::vector<int> context = {0};
   for (std::string w: words){
-    std::vector<int32_t> context = {0};
-    context.resize(BLOCK, 0);
-    for (char& v : w+"."){
-      int32_t ix = stoi.find(v)->second;
-      tensorx.push_back(context);
+    context.resize(3, 0);
+    for (char v : w+'.'){
+      int ix = stoi.find(v)->second;
+      tensorx.insert(tensorx.end(), context.begin(), context.end());
       tensory.push_back(ix);
       context.erase(context.begin());
       context.push_back(ix);
     }
   }
 
-  X = torch::from_blob(tensorx.data(), {static_cast<int32_t>(tensorx.size()), static_cast<int32_t>(BLOCK)}, torch::TensorOptions().dtype(torch::kInt32)).clone();
-  Y = torch::from_blob(tensory.data(), {static_cast<int32_t>(tensory.size())}, torch::TensorOptions().dtype(torch::kInt32)).clone();
+  X = torch::from_blob(tensorx.data(), {xraw*col}, opts).contiguous().view({xraw, col}).clone();
+  Y = torch::from_blob(tensory.data(), {xraw}, opts).clone();
   std::cout << "Torch Size is: " << X.sizes() << " Torch Size is: " << Y.sizes() << std::endl;
 }
