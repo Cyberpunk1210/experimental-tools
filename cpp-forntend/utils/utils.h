@@ -73,7 +73,16 @@ void buildDataset(const std::vector<std::string> words, const Map& stoi, torch::
     }
   }
 
-  X = torch::from_blob(tensorx.data(), {xraw*col}, opts).contiguous().view({xraw, col}).clone();
+  X = torch::from_blob(tensorx.data(), {xraw*col}, opts).reshape({xraw, col}).clone();
   Y = torch::from_blob(tensory.data(), {xraw}, opts).clone();
   std::cout << "Torch Size is: " << X.sizes() << " Torch Size is: " << Y.sizes() << std::endl;
+}
+
+void cmp(std::string s, torch::Tensor dt, torch::Tensor t){
+  auto ex = dt.eq(t.grad()).all().item();
+  auto app = torch::allclose(dt, t.grad());
+  float maxdiff = (dt - t.grad()).abs().max().item<float>();
+  // bool app = appclose == 1 ? true : false;
+  // std::cout << appclose << sizeof(appclose) << std::endl;
+  std::cout << std::left << std::setw(15) << s << " | exact :" << std::left << std::setw(5) <<  ex << " | approximate: " << std::left << std::setw(5) << app << " | maxdiff :" << maxdiff << std::endl;
 }

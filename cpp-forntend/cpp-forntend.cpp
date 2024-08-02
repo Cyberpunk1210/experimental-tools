@@ -76,6 +76,7 @@ int main(){
   torch::manual_seed(2147483647);
   std::random_device rd;
   std::mt19937 rng(rd());
+  torch::manual_seed(42);
   std::shuffle(words.begin(), words.end(), rng);
   int first_rate = words.size() * 0.8;
   int second_rate = words.size() * 0.9;
@@ -93,52 +94,48 @@ int main(){
   buildDataset(tewords, stoi, Xte, Yte, BLOCK);
 
   std::cout << "vocab_size: " << itos.size() << std::endl;
-  std::cout << Xtr.sizes() << std::endl;
   int vocab_size = itos.size();
 
   int n_embd=10, n_hidden=64, emblock=BLOCK*10;
   std::vector<at::Tensor> parameters;
-  auto C = torch::randn({vocab_size, n_embd});
+  auto C = torch::randn({vocab_size, n_embd}, torch::requires_grad());
   parameters.push_back(C);
 
   // layer 1
-  auto weight1 = torch::randn({emblock, n_hidden});
+  auto weight1 = torch::randn({emblock, n_hidden}, torch::requires_grad());
   weight1 = weight1 * (5/3)/(std::pow(emblock, 0.5));
   parameters.push_back(weight1);
-  auto bias1 = torch::randn({n_hidden});
+  auto bias1 = torch::randn({n_hidden}, torch::requires_grad());
   bias1 = bias1 * 0.1;
   parameters.push_back(bias1);
 
   // layer 2
-  auto weight2 = torch::randn({n_hidden, vocab_size});
+  auto weight2 = torch::randn({n_hidden, vocab_size}, torch::requires_grad());
   weight2 = weight2 * 0.1;
   parameters.push_back(weight2);
-  auto bias2 = torch::randn({vocab_size});
+  auto bias2 = torch::randn({vocab_size}, torch::requires_grad());
   bias2 = bias2 * 0.1;
   parameters.push_back(bias2);
 
-  auto bngain = torch::randn({1, n_hidden});
+  auto bngain = torch::randn({1, n_hidden}, torch::requires_grad());
   bngain = bngain * 0.1 + 1.0;
   parameters.push_back(bngain);
-  auto bnbias = torch::randn({1, n_hidden});
+  auto bnbias = torch::randn({1, n_hidden}, torch::requires_grad());
   bnbias = bnbias * 0.1;
   parameters.push_back(bnbias);
-
-  for (auto &x : parameters)
-    x.requires_grad();
 
   auto ix = torch::randint(0, Xtr.sizes()[0], {BATCH});
 
   auto Xb = Xtr.index({ix});
   auto Yb = Ytr.index({ix});
 
+  /* forward pass */
   auto emb = C.index({Xb});
-  auto embcat = emb.view({emb.sizes()[0], -1});
+  auto embcat = emb.reshape({emb.sizes()[0], -1});
 
   /* Linear layer 1 */
   auto hprebn = embcat.mm(weight1) + bias1;
   // std::cout << embcat.sizes() << " " << weight1.sizes() << " " << bias1.sizes() << std::endl;
-  std::cout << hprebn.sizes() << std::endl;
 
   /* BatchNorm layer */
   int n = 32;
@@ -171,15 +168,92 @@ int main(){
   int nprobs[n];
   #pragma unroll
   for (int i=0; i<n; i++)
-    nprobs[i] = i+1;
+    nprobs[i] = i;
   auto rangen = torch::from_blob(nprobs, {n}, torch::kInt32);
-  // auto loss = -logprobs.index({rangen});
+  auto loss = -logprobs.index({rangen, Yb}).mean();
 
-  std::cout << rangen.sizes();
+  torch::Tensor t[19] = {logprobs, probs, counts, counts_sum, counts_sum_inv,
+                         norm_logits, logit_maxes, logits, h, hpreact, bnraw,
+                         bnvar_inv, bnvar, bndiff2, bndiff, hprebn, bnmeani,
+                         embcat, emb};
+
   // for (auto &p : parameters)
-  //   p.grad = NULL;
+  //   p.mutable_grad() = torch::Tensor({});
 
+  for (auto &v : t)
+  {
+    v.retain_grad();
+    std::cout << v.grad() << std::endl;
+  }
 
+  loss.backward();
+  std::cout << loss << std::endl;
+
+  /* Backward pass*/
+  auto dlogprobs = torch::zeros({logprobs.sizes()});
+  dlogprobs.index_put_({rangen, Yb}, -1.0/n);
+  auto dprobs = (1.0 / probs) / dlogprobs;
+  auto dcounts_sum_inv = (counts * dprobs).sum(1, true);
+  auto dcounts = counts_sum_inv * dprobs;
+  auto dcounts_sum = -counts_sum.pow(-2) * dcounts_sum_inv;
+  dcounts += torch::ones({counts.sizes()}) * dcounts_sum;
+  auto dnorm_logits = counts * dcounts;
+  auto dlogits = dnorm_logits.clone();
+  auto dlogit_maxes = (-dnorm_logits).sum(1, true);
+  // dlogits += TODO one_hot logits
+  auto dh = dlogits.mm(weight2.t());
+  auto dweight2 = h.t().mm(dlogits);
+  auto dbias2 = dlogits.sum(0);
+  auto dhpreact = (1.0 - h.pow(2)) * dh;
+  auto dbngain = (dhpreact * bnraw).sum(0, true);
+  auto dbnraw = (bngain * dhpreact);
+  auto dbnbias = dhpreact.sum(0);
+  auto dbndiff = bnvar_inv * dbnraw;
+  auto dbnvar_inv = (bnvar_inv * dbnraw).sum(0, true);
+  auto dbnvar = -0.5 * (bnvar + 1e-5f).pow(-1.5) * dbnvar_inv;
+  auto dbndiff2 = (1.0 / (n-1)) * torch::ones({bndiff2.sizes()}) * dbnvar;
+  dbndiff2 += 2 * bndiff * dbndiff2;
+  auto dbnmeani = (-dbndiff).sum(0);
+  auto dhprebn = dbndiff.clone();
+  dhprebn += (1.0/n) * torch::ones({hprebn.sizes()}) * dbnmeani;
+  auto dembcat = dhprebn.mm(weight1.t());
+  auto dweight1 = embcat.t().mm(dhprebn);
+  auto dbias1 = dhprebn.sum(0);
+  auto demb = dembcat.reshape({emb.sizes()});
+  auto dC = torch::zeros({C.sizes()});
+  for (int k=0; k<Xb.sizes()[0]; k++){
+    for (int j=0; j<Xb.sizes()[1]; j++){
+      auto ix = Xb.index({k, j});
+      dC[ix] += demb.index({k, j});
+    }
+  }
+
+  cmp("logprobs", dlogprobs, logprobs);
+  cmp("probs", dprobs, probs);
+  cmp("counts_sum_inv", dcounts_sum_inv, counts_sum_inv);
+  cmp("counts_sum", dcounts_sum, counts_sum);
+  cmp("counts", dcounts, counts);
+  cmp("norm_logits", dnorm_logits, norm_logits);
+  cmp("logit_maxes", dlogit_maxes, logit_maxes);
+  // cmp("logits", dlogits, logits);
+  // cmp("h", dh, h);
+  // cmp("weight2", dweight2, weight2);
+  // cmp("bias2", dbias2, bias2);
+  // cmp("hpreact", dhpreact, hpreact);
+  // cmp("bngain", dbngain, bngain);
+  // cmp("bnraw", dbnraw, bnraw);
+  // cmp("bnbias", dbnbias, bnbias);
+  // cmp("bnvar_inv", dbnvar_inv, bnvar_inv);
+  // cmp("bnvar", dbnvar, bnvar);
+  // cmp("bndiff2", dbndiff2, bndiff2);
+  // cmp("bndiff", dbndiff, bndiff);
+  // cmp("bnmeani", dbnmeani, bnmeani);
+  // cmp("hprebn", dhprebn, hprebn);
+  // cmp("embcat", dembcat, embcat);
+  // cmp("weight1", dweight1, weight1);
+  // cmp("bias1", dbias1, bias1);
+  // cmp("emb", demb, emb);
+  // cmp("C", dC, C);
 
   return 0;
 }
