@@ -254,6 +254,7 @@ int main(){
   cmp("emb", demb, emb);
   cmp("C", dC, C);
 
+  /* unnecessary */
   // auto loss_fast = torch::nn::functional::cross_entropy(logits, Yb);
   // std::cout << loss_fast.item() << "diff: " << (loss_fast - loss).item() << std::endl;
 
@@ -263,6 +264,8 @@ int main(){
   // std::cout << "Original func: " << torch::nn::functional::softmax(logits, 1)[0] << std::endl;
   // std::cout << "Manually func: " << dlogits[0] * n << std::endl;
   // std::cout << dlogits[0].sum() << std::endl;
+
+  /* TODO forward pass & backward pass & inference*/
 
   return 0;
 }
