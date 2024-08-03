@@ -9,7 +9,7 @@
 
 #define BLOCK 3
 
-bool compare(std::string a, std::string b){ return a < b;}
+bool compare(std::string a, std::string b){ return a < b; }
 
 template <typename Map>
 void IndexMap(Map& m){
@@ -63,7 +63,7 @@ void buildDataset(const std::vector<std::string> words, const Map& stoi, torch::
   auto opts = torch::TensorOptions().dtype(torch::kInt32);
   std::vector<int> context = {0};
   for (std::string w: words){
-    context.resize(3, 0);
+    context.resize(col, 0);
     for (char v : w+'.'){
       int ix = stoi.find(v)->second;
       tensorx.insert(tensorx.end(), context.begin(), context.end());
@@ -81,8 +81,7 @@ void buildDataset(const std::vector<std::string> words, const Map& stoi, torch::
 void cmp(std::string s, torch::Tensor dt, torch::Tensor t){
   auto ex = dt.eq(t.grad()).all().item();
   auto app = torch::allclose(dt, t.grad());
-  float maxdiff = (dt - t.grad()).abs().max().item<float>();
-  // bool app = appclose == 1 ? true : false;
-  // std::cout << appclose << sizeof(appclose) << std::endl;
-  std::cout << std::left << std::setw(15) << s << " | exact :" << std::left << std::setw(5) <<  ex << " | approximate: " << std::left << std::setw(5) << app << " | maxdiff :" << maxdiff << std::endl;
+  auto maxdiff = (dt - t.grad()).abs().max().item<float>();
+
+  std::cout << std::left << std::setw(15) << s << " | exact: " << std::left << std::setw(5) <<  ex << " | approximate: " << std::left << std::setw(5) << app << " | maxdiff :" << maxdiff << std::endl;
 }

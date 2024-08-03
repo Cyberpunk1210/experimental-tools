@@ -177,14 +177,11 @@ int main(){
                          bnvar_inv, bnvar, bndiff2, bndiff, hprebn, bnmeani,
                          embcat, emb};
 
-  // for (auto &p : parameters)
-  //   p.mutable_grad() = torch::Tensor({});
+  for (auto &p : parameters)
+    p.retain_grad();
 
   for (auto &v : t)
-  {
     v.retain_grad();
-    std::cout << v.grad() << std::endl;
-  }
 
   loss.backward();
   std::cout << loss << std::endl;
@@ -192,7 +189,7 @@ int main(){
   /* Backward pass*/
   auto dlogprobs = torch::zeros({logprobs.sizes()});
   dlogprobs.index_put_({rangen, Yb}, -1.0/n);
-  auto dprobs = (1.0 / probs) / dlogprobs;
+  auto dprobs = (1.0 / probs) * dlogprobs;
   auto dcounts_sum_inv = (counts * dprobs).sum(1, true);
   auto dcounts = counts_sum_inv * dprobs;
   auto dcounts_sum = -counts_sum.pow(-2) * dcounts_sum_inv;
@@ -200,7 +197,9 @@ int main(){
   auto dnorm_logits = counts * dcounts;
   auto dlogits = dnorm_logits.clone();
   auto dlogit_maxes = (-dnorm_logits).sum(1, true);
-  // dlogits += TODO one_hot logits
+  std::tuple<torch::Tensor, torch::Tensor> maxtuple = torch::max(logits, 1);
+  torch::Tensor max_indices = std::get<1>(maxtuple);
+  dlogits += torch::nn::functional::one_hot(max_indices, logits.sizes()[1]) * dlogit_maxes;
   auto dh = dlogits.mm(weight2.t());
   auto dweight2 = h.t().mm(dlogits);
   auto dbias2 = dlogits.sum(0);
@@ -210,7 +209,7 @@ int main(){
   auto dbnbias = dhpreact.sum(0);
   auto dbndiff = bnvar_inv * dbnraw;
   auto dbnvar_inv = (bnvar_inv * dbnraw).sum(0, true);
-  auto dbnvar = -0.5 * (bnvar + 1e-5f).pow(-1.5) * dbnvar_inv;
+  auto dbnvar = -0.5 * (bnvar + 1e-10f).pow(-1.5) * dbnvar_inv;
   auto dbndiff2 = (1.0 / (n-1)) * torch::ones({bndiff2.sizes()}) * dbnvar;
   dbndiff2 += 2 * bndiff * dbndiff2;
   auto dbnmeani = (-dbndiff).sum(0);
@@ -235,25 +234,25 @@ int main(){
   cmp("counts", dcounts, counts);
   cmp("norm_logits", dnorm_logits, norm_logits);
   cmp("logit_maxes", dlogit_maxes, logit_maxes);
-  // cmp("logits", dlogits, logits);
-  // cmp("h", dh, h);
-  // cmp("weight2", dweight2, weight2);
-  // cmp("bias2", dbias2, bias2);
-  // cmp("hpreact", dhpreact, hpreact);
-  // cmp("bngain", dbngain, bngain);
-  // cmp("bnraw", dbnraw, bnraw);
-  // cmp("bnbias", dbnbias, bnbias);
-  // cmp("bnvar_inv", dbnvar_inv, bnvar_inv);
-  // cmp("bnvar", dbnvar, bnvar);
-  // cmp("bndiff2", dbndiff2, bndiff2);
-  // cmp("bndiff", dbndiff, bndiff);
-  // cmp("bnmeani", dbnmeani, bnmeani);
-  // cmp("hprebn", dhprebn, hprebn);
-  // cmp("embcat", dembcat, embcat);
-  // cmp("weight1", dweight1, weight1);
-  // cmp("bias1", dbias1, bias1);
-  // cmp("emb", demb, emb);
-  // cmp("C", dC, C);
+  cmp("logits", dlogits, logits);
+  cmp("h", dh, h);
+  cmp("weight2", dweight2, weight2);
+  cmp("bias2", dbias2, bias2);
+  cmp("hpreact", dhpreact, hpreact);
+  cmp("bngain", dbngain, bngain);
+  cmp("bnraw", dbnraw, bnraw);
+  cmp("bnbias", dbnbias, bnbias);
+  cmp("bnvar_inv", dbnvar_inv, bnvar_inv);
+  cmp("bnvar", dbnvar, bnvar);
+  cmp("bndiff2", dbndiff2, bndiff2);
+  cmp("bndiff", dbndiff, bndiff);
+  cmp("bnmeani", dbnmeani, bnmeani);
+  cmp("hprebn", dhprebn, hprebn);
+  cmp("embcat", dembcat, embcat);
+  cmp("weight1", dweight1, weight1);
+  cmp("bias1", dbias1, bias1);
+  cmp("emb", demb, emb);
+  cmp("C", dC, C);
 
   return 0;
 }
