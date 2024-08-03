@@ -208,10 +208,10 @@ int main(){
   auto dbnraw = (bngain * dhpreact);
   auto dbnbias = dhpreact.sum(0);
   auto dbndiff = bnvar_inv * dbnraw;
-  auto dbnvar_inv = (bnvar_inv * dbnraw).sum(0, true);
-  auto dbnvar = -0.5 * (bnvar + 1e-10f).pow(-1.5) * dbnvar_inv;
-  auto dbndiff2 = (1.0 / (n-1)) * torch::ones({bndiff2.sizes()}) * dbnvar;
-  dbndiff2 += 2 * bndiff * dbndiff2;
+  auto dbnvar_inv = (bndiff * dbnraw).sum(0, true);
+  auto dbnvar = -0.5 * (bnvar + 1e-5f).pow(-1.5) * dbnvar_inv;
+  auto dbndiff2 = (1.0 / (n-1))* torch::ones({bndiff2.sizes()}) * dbnvar;
+  dbndiff += 2 * bndiff * dbndiff2;
   auto dbnmeani = (-dbndiff).sum(0);
   auto dhprebn = dbndiff.clone();
   dhprebn += (1.0/n) * torch::ones({hprebn.sizes()}) * dbnmeani;
@@ -253,6 +253,16 @@ int main(){
   cmp("bias1", dbias1, bias1);
   cmp("emb", demb, emb);
   cmp("C", dC, C);
+
+  // auto loss_fast = torch::nn::functional::cross_entropy(logits, Yb);
+  // std::cout << loss_fast.item() << "diff: " << (loss_fast - loss).item() << std::endl;
+
+  // dlogits = torch::nn::functional::softmax(logits, 1);
+  // dlogits = (dlogits.index({rangen, Yb}) - 1) / n;
+  // cmp("logits", dlogits, logits);
+  // std::cout << "Original func: " << torch::nn::functional::softmax(logits, 1)[0] << std::endl;
+  // std::cout << "Manually func: " << dlogits[0] * n << std::endl;
+  // std::cout << dlogits[0].sum() << std::endl;
 
   return 0;
 }
