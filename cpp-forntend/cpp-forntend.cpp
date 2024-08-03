@@ -15,6 +15,7 @@
 
 #define BATCH 32
 
+namespace F = torch::nn::functional;
 
 int main(){
   std::string filename = "names.txt";
@@ -179,6 +180,7 @@ int main(){
 
   for (auto &p : parameters)
     p.retain_grad();
+  // p.requires_grad_(true);
 
   for (auto &v : t)
     v.retain_grad();
@@ -199,7 +201,7 @@ int main(){
   auto dlogit_maxes = (-dnorm_logits).sum(1, true);
   std::tuple<torch::Tensor, torch::Tensor> maxtuple = torch::max(logits, 1);
   torch::Tensor max_indices = std::get<1>(maxtuple);
-  dlogits += torch::nn::functional::one_hot(max_indices, logits.sizes()[1]) * dlogit_maxes;
+  dlogits += F::one_hot(max_indices, logits.sizes()[1]) * dlogit_maxes;
   auto dh = dlogits.mm(weight2.t());
   auto dweight2 = h.t().mm(dlogits);
   auto dbias2 = dlogits.sum(0);
@@ -266,6 +268,104 @@ int main(){
   // std::cout << dlogits[0].sum() << std::endl;
 
   /* TODO forward pass & backward pass & inference*/
+  n_embd = 10;
+  n_hidden = 200;
+  C = torch::randn({vocab_size, n_embd});
+  /* Layer 1 */
+  auto W1 = torch::randn({n_embd * BLOCK, n_hidden});
+  W1 = W1 * (5/3)/(std::pow(n_embd * BLOCK, 0.5));
+  auto b1 = torch::randn({n_hidden});
+  b1 *= 0.1;
+  /* Layer 2 */
+  auto W2 = torch::randn({n_hidden, vocab_size});
+  W2 *= 0.1;
+  auto b2 = torch::randn({vocab_size});
+  b2 *= 0.1;
+  /* BatchNorm parameters */
+  bngain = torch::randn({1, n_hidden});
+  bngain = bngain * 0.1 + 1.0;
+  bnbias = torch::randn({1, n_hidden});
+  bnbias *= 0.1;
+
+  std::vector<torch::Tensor> paras = {C, W1, b1, W2, b2, bngain, bnbias};
+
+  for (auto &p : paras)
+    p.requires_grad_(true);
+
+  int max_steps = 200000;
+  int batch_size;
+  batch_size = n = 12;
+  std::vector<float> lossi;
+
+  /* no_grad */
+  {
+  torch::NoGradGuard nogard;
+  torch::manual_seed(2147483647);
+
+  for (int i=0; i<max_steps; i++){
+    auto ix = torch::randint(0, Xtr.sizes()[0], {batch_size});
+    auto Xb = Xtr.index({ix});
+    auto Yb = Ytr.index({ix});
+
+    auto emb = C.index({Xb});
+    auto embcat = emb.view({emb.sizes()[0], -1});
+    auto hprebn = embcat.mm(W1) + b1;
+
+    auto bnmean = hprebn.mean(0, true);
+    auto bnvar = hprebn.var(0, true, true);
+    auto bnvar_inv = (bnvar + 1e-5f).pow(-0.5);
+    auto bnraw = (hprebn - bnmean) * bnvar_inv;
+    auto hpreact = bngain * bnraw + bnbias;
+    /* Non-linearity */
+    auto h = torch::tanh(hpreact);
+    auto logits = h.mm(W2) + b2;
+    auto loss = F::cross_entropy(logits, Yb.toType(torch::kLong), F::CrossEntropyFuncOptions().ignore_index(-100).reduction(torch::kMean));
+
+    for (auto &p : parameters)
+      p.grad().zero_();
+
+
+    /* manual backprop */
+    auto dlogits = F::softmax(logits, 1);
+    auto rangesecn = torch::from_blob(nprobs, {n}, torch::kInt32);
+    dlogits.index({rangesecn, Yb}) -= 1;
+    dlogits /= n;
+
+    auto dh = dlogits.mm(W2.t());
+    auto dW2 = h.t().mm(dlogits);
+    auto db2 = dlogits.sum(0);
+
+    auto dhpreact = (1.0 - h.pow(2)) * dh;
+
+    auto dbngain = (bnraw * dhpreact).sum(0, true);
+    auto dbnbias = dhpreact.sum(0, true);
+    auto dhprebn = bngain*bnvar_inv/n * (n*dhpreact - dhpreact.sum(0) - n/(n-1)*bnraw*(dhpreact*bnraw).sum(0));
+
+    auto dembcat = dhprebn.mm(W1.t());
+    auto dW1 = embcat.t().mm(dhprebn);
+    auto db1 = dhprebn.sum(0);
+
+    auto demb = dembcat.view({emb.sizes()});
+    auto dC = torch::zeros({C.sizes()});
+    for (int k=0; k<Xb.sizes()[0]; k++){
+      for (int j=0; j<Xb.sizes()[1]; j++){
+        auto ix = Xb.index({k, j});
+        dC.index({ix}) += demb.index({k, j});
+      }
+    }
+    std::vector<torch::Tensor> grads = {dC, dW1, db1, dW2, db2, dbngain, dbnbias};
+    float lr = 0.1 ? i < 100000 : 0.01;
+    for (int i=0; i<paras.size(); i++)
+      paras[i].data() += -lr * grads[i];
+
+    if (i % 10000 == 0)
+      std::cout << std::left << std::setw(6) << i+1 << "/" << max_steps << " : " << loss.item() << std::endl;
+
+    torch::Tensor loss_val = torch::log10(loss);
+    // std::cout << loss_val.item<float
+    lossi.push_back(loss_val.item<float>());
+  }
+  }
 
   return 0;
 }
