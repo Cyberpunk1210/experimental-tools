@@ -350,12 +350,13 @@ int main(){
 
     auto demb = dembcat.view({emb.sizes()});
     auto dC = torch::zeros({C.sizes()});
-    for (int k=0; k<Xb.sizes()[0]; k++){
-      for (int j=0; j<Xb.sizes()[1]; j++){
-        auto ix = Xb.index({k, j});
-        dC.index({ix}) += demb.index({k, j});
-      }
-    }
+    // for (int k=0; k<Xb.sizes()[0]; k++){
+    //   for (int j=0; j<Xb.sizes()[1]; j++){
+    //     auto ix = Xb.index({k, j});
+    //     dC.index({ix}) += demb.index({k, j});
+    //   }
+    // }
+    dC.index({Xb}).add_(demb);
     std::vector<torch::Tensor> grads = {dC, dW1, db1, dW2, db2, dbngain, dbnbias};
     float lr = i < 100000 ? 0.1 : 0.01;
     for (int i=0; i<paras.size(); ++i)
@@ -366,10 +367,10 @@ int main(){
 
     auto loss_val = torch::log10(loss);
     lossi.push_back(loss_val.item<float>());
-  }
+  }                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
   end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_times = end - start;
-  std::cout << "Done, Elapsed times: " << elapsed_times.count() << "\n";
+  std::cout << "Done, Elapsed times: " << elapsed_times.count() << 's' << "\n";
   }
 
   return 0;
