@@ -12,6 +12,7 @@
 #include <torch/torch.h>
 #include <ATen/ATen.h>
 #include <torch/extension.h>
+#include <chrono>
 
 #define BATCH 32
 
@@ -299,6 +300,8 @@ int main(){
 
   /* no_grad */
   {
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  start = std::chrono::system_clock::now();
   torch::NoGradGuard nogard;
   torch::manual_seed(2147483647);
 
@@ -354,17 +357,19 @@ int main(){
       }
     }
     std::vector<torch::Tensor> grads = {dC, dW1, db1, dW2, db2, dbngain, dbnbias};
-    float lr = 0.1 ? i < 100000 : 0.01;
-    for (int i=0; i<paras.size(); i++)
+    float lr = i < 100000 ? 0.1 : 0.01;
+    for (int i=0; i<paras.size(); ++i)
       paras[i].data() += -lr * grads[i];
 
     if (i % 10000 == 0)
-      std::cout << std::left << std::setw(6) << i+1 << "/" << max_steps << " : " << loss.item() << std::endl;
+      std::cout << std::left << std::setw(6) << i << "/" << max_steps << " : " << loss.item() << std::endl;
 
-    torch::Tensor loss_val = torch::log10(loss);
-    // std::cout << loss_val.item<float
+    auto loss_val = torch::log10(loss);
     lossi.push_back(loss_val.item<float>());
   }
+  end = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_times = end - start;
+  std::cout << "Done, Elapsed times: " << elapsed_times.count() << "\n";
   }
 
   return 0;
