@@ -62,6 +62,7 @@ void buildDataset(const std::vector<std::string> words, const Map& stoi, torch::
   std::vector<int> tensory;
   auto opts = torch::TensorOptions().dtype(torch::kInt32);
   std::vector<int> context = {0};
+  #pragma unroll
   for (std::string w: words){
     context.resize(col, 0);
     for (char v : w+'.'){
