@@ -136,7 +136,7 @@ int main(){
   auto embcat = emb.reshape({emb.sizes()[0], -1});
 
   /* Linear layer 1 */
-  auto hprebn = embcat.mm(weight1) + bias1;
+  auto hprebn = embcat.matmul(weight1) + bias1;
   // std::cout << embcat.sizes() << " " << weight1.sizes() << " " << bias1.sizes() << std::endl;
 
   /* BatchNorm layer */

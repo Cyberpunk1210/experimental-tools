@@ -17,10 +17,9 @@ __global__ void MatAdd_kernel(at::Tensor A, at::Tensor B, at::Tensor C)
 }
 
 
-__global__ void cmp_kelnel(std::string s, at::Tensor dt, at::Tensor t)
+__global__ void MatSum_kernel(at::Tensor A, int dim, bool keepdim)
 {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int idy = blockIdx.y * blockIdx.y + threadIdx.y;
-    
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    A[i][j]
 }
-
