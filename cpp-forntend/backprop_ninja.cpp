@@ -1,4 +1,5 @@
-#include "utils.h"
+#include "include/utils.h"
+#include "include/tools.cuh"
 
 #include <iostream>
 #include <vector>
@@ -15,6 +16,9 @@
 #include <chrono>
 
 #define BATCH 32
+#define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x "must be a CUDA tensor");
+#define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_congitugous(), #x" must be contiguous")
+#define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
 
 namespace F = torch::nn::functional;
 
@@ -293,7 +297,7 @@ int main(){
   for (auto &p : paras)
     p.requires_grad_(true);
 
-  int max_steps = 200000;
+  int max_steps = 2000;
   int batch_size;
   batch_size = n = 12;
   std::vector<float> lossi;
@@ -372,6 +376,8 @@ int main(){
   std::chrono::duration<double> elapsed_times = end - start;
   std::cout << "Done, Elapsed times: " << elapsed_times.count() << 's' << "\n";
   }
+
+  cuda_kernel();
 
   return 0;
 }

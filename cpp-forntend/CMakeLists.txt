@@ -9,8 +9,8 @@ find_package(CUDA)
 set(CUDA_NVCC_FLAGS -gencode arch=compute_86,code=sm_86;-G;-g)
 
 add_executable(main backprop_ninja.cpp
-                    utils/utils.h
-                    utils/tools.cuh)
+                    include/utils.h
+                    include/tools.cuh)
 find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 target_include_directories(${PROJECT_NAME} PRIVATE ${Python3_INCLUDE_DIRS} utils)
 target_link_libraries(${PROJECT_NAME} ${Python3_LIBRARIES})
