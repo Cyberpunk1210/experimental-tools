@@ -1,5 +1,4 @@
 #include "include/utils.h"
-#include "include/tools.cuh"
 
 #include <iostream>
 #include <vector>
@@ -14,6 +13,7 @@
 #include <ATen/ATen.h>
 #include <torch/extension.h>
 #include <chrono>
+#include <omp.h>
 
 #define BATCH 32
 #define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x "must be a CUDA tensor");
@@ -23,6 +23,8 @@
 namespace F = torch::nn::functional;
 
 int main(){
+  omp_set_num_threads(8);
+
   std::string filename = "names.txt";
   std::fstream myfile;
 
@@ -60,11 +62,13 @@ int main(){
   std::sort(combing_string.begin(), combing_string.end(), [](char x, char y) {return x < y; });
   combing_string.erase(std::unique(combing_string.begin(), combing_string.end()), combing_string.end());
 
+  #pragma unroll
   for (int i=0; i<combing_string.size(); i++)
     sorted_string.push_back(combing_string[i]);
 
   std::map<int, char> itos;
   std::map<char, int> stoi;
+  #pragma unroll
   for (int i=0; i<sorted_string.size(); i++)
   {
     itos[i+1] = sorted_string[i];
@@ -130,14 +134,14 @@ int main(){
   bnbias = bnbias * 0.1;
   parameters.push_back(bnbias);
 
-  auto ix = torch::randint(0, Xtr.sizes()[0], {BATCH});
+  auto ix = torch::randint(0, Xtr.size(0), {BATCH});
 
   auto Xb = Xtr.index({ix});
   auto Yb = Ytr.index({ix});
 
   /* forward pass */
   auto emb = C.index({Xb});
-  auto embcat = emb.reshape({emb.sizes()[0], -1});
+  auto embcat = emb.reshape({emb.size(0), -1});
 
   /* Linear layer 1 */
   auto hprebn = embcat.matmul(weight1) + bias1;
@@ -206,7 +210,7 @@ int main(){
   auto dlogit_maxes = (-dnorm_logits).sum(1, true);
   std::tuple<torch::Tensor, torch::Tensor> maxtuple = torch::max(logits, 1);
   torch::Tensor max_indices = std::get<1>(maxtuple);
-  dlogits += F::one_hot(max_indices, logits.sizes()[1]) * dlogit_maxes;
+  dlogits += F::one_hot(max_indices, logits.size(1)) * dlogit_maxes;
   auto dh = dlogits.mm(weight2.t());
   auto dweight2 = h.t().mm(dlogits);
   auto dbias2 = dlogits.sum(0);
@@ -227,8 +231,10 @@ int main(){
   auto dbias1 = dhprebn.sum(0);
   auto demb = dembcat.reshape({emb.sizes()});
   auto dC = torch::zeros({C.sizes()});
-  for (int k=0; k<Xb.sizes()[0]; k++){
-    for (int j=0; j<Xb.sizes()[1]; j++){
+
+  #pragma unroll
+  for (int k=0; k<Xb.size(0); k++){
+    for (int j=0; j<Xb.size(1); j++){
       auto ix = Xb.index({k, j});
       dC[ix] += demb.index({k, j});
     }
@@ -310,12 +316,12 @@ int main(){
   torch::manual_seed(2147483647);
 
   for (int i=0; i<max_steps; i++){
-    auto ix = torch::randint(0, Xtr.sizes()[0], {batch_size});
+    auto ix = torch::randint(0, Xtr.size(0), {batch_size});
     auto Xb = Xtr.index({ix});
     auto Yb = Ytr.index({ix});
 
     auto emb = C.index({Xb});
-    auto embcat = emb.view({emb.sizes()[0], -1});
+    auto embcat = emb.view({emb.size(0), -1});
     auto hprebn = embcat.mm(W1) + b1;
 
     auto bnmean = hprebn.mean(0, true);
@@ -376,8 +382,6 @@ int main(){
   std::chrono::duration<double> elapsed_times = end - start;
   std::cout << "Done, Elapsed times: " << elapsed_times.count() << 's' << "\n";
   }
-
-  cuda_kernel();
 
   return 0;
 }
