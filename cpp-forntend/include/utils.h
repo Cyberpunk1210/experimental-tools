@@ -80,8 +80,8 @@ void buildDataset(const std::vector<std::string> words, const Map& stoi, torch::
 }
 
 void cmp(std::string s, torch::Tensor dt, torch::Tensor t){
-  auto ex = dt.eq(t.grad()).all().item();
-  auto app = torch::allclose(dt, t.grad());
+  c10::Scalar ex = dt.eq(t.grad()).all().item();
+  c10::Scalar app = torch::allclose(dt, t.grad());
   auto maxdiff = (dt - t.grad()).abs().max().item<float>();
 
   std::cout << std::left << std::setw(15) << s << " | exact: " << std::left << std::setw(5) <<  ex << " | approximate: " << std::left << std::setw(5) << app << " | maxdiff :" << maxdiff << std::endl;

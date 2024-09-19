@@ -19,12 +19,11 @@
 #define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x "must be a CUDA tensor");
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_congitugous(), #x" must be contiguous")
 #define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
+#define NUM_THREADS auto thds = omp_get_num_threads();
 
 namespace F = torch::nn::functional;
 
-int main(){
-  omp_set_num_threads(8);
-
+int main() {
   std::string filename = "names.txt";
   std::fstream myfile;
 
@@ -43,7 +42,8 @@ int main(){
 
   std::vector<int> maxLen;
   std::vector<int>::iterator result;
-  for (int i=0; i<words.size(); i++){
+  #pragma omp parallel for num_thread(NUM_THREADS);
+  for (int i=0; i<words.size(); i++) {
     int lens = words[i].size();
     maxLen.push_back(lens);
   }
@@ -68,7 +68,7 @@ int main(){
 
   std::map<int, char> itos;
   std::map<char, int> stoi;
-  #pragma unroll
+  #pragma omp parallel for schedule(static)
   for (int i=0; i<sorted_string.size(); i++)
   {
     itos[i+1] = sorted_string[i];
