@@ -42,7 +42,7 @@ int main() {
 
   std::vector<int> maxLen;
   std::vector<int>::iterator result;
-  #pragma omp parallel for num_thread(NUM_THREADS);
+  #pragma unroll
   for (int i=0; i<words.size(); i++) {
     int lens = words[i].size();
     maxLen.push_back(lens);
@@ -70,7 +70,8 @@ int main() {
 
   std::map<int, char> itos;
   std::map<char, int> stoi;
-  #pragma omp parallel for schedule(static)
+
+  #pragma unroll
   for (int i=0; i<sorted_string.size(); i++)
   {
     itos[i+1] = sorted_string[i];
@@ -230,7 +231,7 @@ int main() {
   auto demb = dembcat.reshape({emb.sizes()});
   auto dC = torch::zeros({C.sizes()});
 
-  #pragma unroll
+  #pragma omp parallel for collapse(2)
   for (int k=0; k<Xb.size(0); k++){
     for (int j=0; j<Xb.size(1); j++){
       auto ix = Xb.index({k, j});
@@ -301,7 +302,7 @@ int main() {
   for (auto &p : paras)
     p.requires_grad_(true);
 
-  int max_steps = 2000;
+  int max_steps = 10000;
   int batch_size;
   batch_size = n = 12;
   std::vector<float> lossi;
@@ -313,7 +314,6 @@ int main() {
   torch::NoGradGuard nogard;
   torch::manual_seed(2147483647);
 
-  #pragma omp paraller  
   for (int i=0; i<max_steps; i++){
     auto ix = torch::randint(0, Xtr.size(0), {batch_size});
     auto Xb = Xtr.index({ix});
@@ -359,13 +359,21 @@ int main() {
 
     auto demb = dembcat.view({emb.sizes()});
     auto dC = torch::zeros({C.sizes()});
-    dC.index({Xb}).add_(demb);
+    #pragma omp parallel for collapse(2)
+    for (int k=0; k<Xb.size(0); k++){
+      for (int j=0; j<Xb.size(1); j++){
+        auto ix = Xb.index({k, j});
+        dC[ix] += demb.index({k, j});
+      }
+    }
+    
     std::vector<torch::Tensor> grads = {dC, dW1, db1, dW2, db2, dbngain, dbnbias};
-    float lr = i < 100000 ? 0.1 : 0.01;
+    float lr = i < 5000 ? 0.1 : 0.01;
+    #pragma omp parallel for
     for (int i=0; i<paras.size(); ++i)
       paras[i].data() += -lr * grads[i];
 
-    if (i % 10000 == 0)
+    if (i % 1000 == 0)
       std::cout << std::left << std::setw(6) << i << "/" << max_steps << " : " << loss.item() << std::endl;
 
     auto loss_val = torch::log10(loss);
