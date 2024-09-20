@@ -19,7 +19,7 @@
 #define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x "must be a CUDA tensor");
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_congitugous(), #x" must be contiguous")
 #define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)
-#define NUM_THREADS auto thds = omp_get_num_threads();
+#define NUM_THREADS 12;
 
 namespace F = torch::nn::functional;
 
@@ -50,10 +50,12 @@ int main() {
   result = std::max_element(maxLen.begin(), maxLen.end()); // printf the max length
 
   std::cout << "words lens: " << words.size() << std::endl;
-  std::cout << "The max length is: " << *result << std::endl;
-  std::cout << "The first eight elements are: ";
+  std::cout << "The max length word has : " << *result << std::endl;
+  std::cout << "The first eight elements are shown below: \n";
+
+  #pragma unroll
   for (int i=0; i<8; i++){
-    std::cout << words[i] << " " << std::endl;
+    std::cout << words[i] << "\n";
   }
 
   std::vector<std::string> all_string;
@@ -175,11 +177,7 @@ int main() {
   auto counts_sum_inv = counts_sum.pow(-1);
   auto probs = counts * counts_sum_inv;
   auto logprobs = probs.log();
-  int nprobs[n];
-  #pragma unroll
-  for (int i=0; i<n; i++)
-    nprobs[i] = i;
-  auto rangen = torch::from_blob(nprobs, {n}, torch::kInt32);
+  auto rangen = torch::arange(n, torch::kInt32);
   auto loss = -logprobs.index({rangen, Yb}).mean();
 
   torch::Tensor t[19] = {logprobs, probs, counts, counts_sum, counts_sum_inv,
@@ -315,6 +313,7 @@ int main() {
   torch::NoGradGuard nogard;
   torch::manual_seed(2147483647);
 
+  #pragma omp paraller  
   for (int i=0; i<max_steps; i++){
     auto ix = torch::randint(0, Xtr.size(0), {batch_size});
     auto Xb = Xtr.index({ix});
@@ -340,7 +339,7 @@ int main() {
 
     /* manual backprop */
     auto dlogits = F::softmax(logits, 1);
-    auto rangesecn = torch::from_blob(nprobs, {n}, torch::kInt32);
+    auto rangesecn = torch::arange(n, torch::kInt32);
     dlogits.index({rangesecn, Yb}) -= 1;
     dlogits /= n;
 
@@ -360,12 +359,6 @@ int main() {
 
     auto demb = dembcat.view({emb.sizes()});
     auto dC = torch::zeros({C.sizes()});
-    // for (int k=0; k<Xb.sizes()[0]; k++){
-    //   for (int j=0; j<Xb.sizes()[1]; j++){
-    //     auto ix = Xb.index({k, j});
-    //     dC.index({ix}) += demb.index({k, j});
-    //   }
-    // }
     dC.index({Xb}).add_(demb);
     std::vector<torch::Tensor> grads = {dC, dW1, db1, dW2, db2, dbngain, dbnbias};
     float lr = i < 100000 ? 0.1 : 0.01;
