@@ -1,19 +1,6 @@
 #include "include/utils.h"
 
 #include <iostream>
-#include <vector>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <algorithm>
-#include <map>
-#include <random>
-#include <cmath>
-#include <torch/torch.h>
-#include <ATen/ATen.h>
-#include <torch/extension.h>
-#include <chrono>
-#include <omp.h>
 
 #define BATCH 32
 #define CHECK_CUDA(x) TORCH_CHECK(x.device().is_cuda(), #x "must be a CUDA tensor");
@@ -54,9 +41,7 @@ int main() {
   std::cout << "The first eight elements are shown below: \n";
 
   #pragma unroll
-  for (int i=0; i<8; i++){
-    std::cout << words[i] << "\n";
-  }
+  for (int i=0; i<8; i++){ std::cout << words[i] << "\n"; }
 
   std::vector<std::string> all_string;
   std::vector<char> sorted_string;
@@ -65,8 +50,7 @@ int main() {
   combing_string.erase(std::unique(combing_string.begin(), combing_string.end()), combing_string.end());
 
   #pragma unroll
-  for (int i=0; i<combing_string.size(); i++)
-    sorted_string.push_back(combing_string[i]);
+  for (int i=0; i<combing_string.size(); i++) { sorted_string.push_back(combing_string[i]); }
 
   std::map<int, char> itos;
   std::map<char, int> stoi;
@@ -186,12 +170,10 @@ int main() {
                          bnvar_inv, bnvar, bndiff2, bndiff, hprebn, bnmeani,
                          embcat, emb};
 
-  for (auto &p : parameters)
-    p.retain_grad();
+  for (auto &p : parameters) { p.retain_grad(); }
   // p.requires_grad_(true);
 
-  for (auto &v : t)
-    v.retain_grad();
+  for (auto &v : t) { v.retain_grad(); }
 
   loss.backward();
   std::cout << loss << std::endl;
@@ -299,8 +281,7 @@ int main() {
 
   std::vector<torch::Tensor> paras = {C, W1, b1, W2, b2, bngain, bnbias};
 
-  for (auto &p : paras)
-    p.requires_grad_(true);
+  for (auto &p : paras) { p.requires_grad_(true); }
 
   int max_steps = 10000;
   int batch_size;
@@ -333,9 +314,7 @@ int main() {
     auto logits = h.mm(W2) + b2;
     auto loss = F::cross_entropy(logits, Yb.toType(torch::kLong), F::CrossEntropyFuncOptions().ignore_index(-100).reduction(torch::kMean));
 
-    for (auto &p : parameters)
-      p.grad().zero_();
-
+    for (auto &p : parameters) { p.grad().zero_(); }
 
     /* manual backprop */
     auto dlogits = F::softmax(logits, 1);
@@ -366,12 +345,11 @@ int main() {
         dC[ix] += demb.index({k, j});
       }
     }
-    
+
     std::vector<torch::Tensor> grads = {dC, dW1, db1, dW2, db2, dbngain, dbnbias};
     float lr = i < 5000 ? 0.1 : 0.01;
     #pragma omp parallel for
-    for (int i=0; i<paras.size(); ++i)
-      paras[i].data() += -lr * grads[i];
+    for (int i=0; i<paras.size(); ++i) { paras[i].data() += -lr * grads[i]; }
 
     if (i % 1000 == 0)
       std::cout << std::left << std::setw(6) << i << "/" << max_steps << " : " << loss.item() << std::endl;

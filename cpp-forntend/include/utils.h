@@ -1,11 +1,17 @@
 #pragma once
-#include <iostream>
-#include <string>
-#include <map>
 #include <vector>
 #include <fstream>
+#include <sstream>
+#include <string>
+#include <algorithm>
+#include <map>
+#include <random>
+#include <cmath>
 #include <torch/torch.h>
 #include <ATen/ATen.h>
+#include <torch/extension.h>
+#include <chrono>
+#include <omp.h>
 
 #define BLOCK 3
 
