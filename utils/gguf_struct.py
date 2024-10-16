@@ -10,7 +10,7 @@ import bitsandbytes.nn.modules as bnb
 prefix = os.environ["DATASETPATH"]
 file_path = os.path.join(prefix, "gguf")
 pt_path = os.path.join(prefix, "pt")
-gguf_file = os.path.join(file_path, "model.gguf")
+gguf_file = os.path.join(file_path, "simple_model_fp32.gguf")
 pt_file = os.path.join(pt_path, "model.pt")
 if not os.path.exists(file_path):
     os.mkdir(file_path)
