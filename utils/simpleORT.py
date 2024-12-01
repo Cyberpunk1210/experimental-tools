@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import onnxruntime as ort
 import onnx
+from bitsandbytes.nn import Linear8bitLt
 
 x = torch.randn(1024, 32)
 
@@ -31,4 +32,4 @@ input_name = ort_sess.get_inputs()[0].name
 expr = list(ort_sess.run(None, {input_name: i[None, ...]})[0] for i in x.numpy())
 onnx_yhat = np.concatenate(expr, axis=0)
 
-assert np.allclose(onnx_yhat, yhat.detach().numpy()) # "True"
+assert np.allclose(onnx_yhat, yhat.detach().numpy())  # "True"
