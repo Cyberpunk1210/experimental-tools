@@ -5,6 +5,7 @@ import time
 import torch
 from torch import Tensor
 
+import tabulate
 import triton
 import triton.language as tl
 from triton.runtime import driver
@@ -109,12 +110,40 @@ def benchmark(M, N, provider):
     gbps = lambda ms: 2 * x.numel() * x.element_size() * 1e-9 / (ms * 1e-3)
     return gbps(ms)
 
+def _dropout(
+        x_ptr,
+        x_keep_ptr,
+        output_ptr,
+        n_elements,
+        p,
+        BLOCK_SIZE: tl.constexpr,
+):
+    pid = tl.program_id(axis=0)
+    block_start = pid * BLOCK_SIZE
+    offsets = block_start + tl.arange(0, BLOCK_SIZE)
+    mask = offsets < n_elements
+    # load data
+    x = tl.load(x_ptr, offsets, mask=mask)
+    x_keep = tl.load(x_keep_ptr + offsets, mask=mask)
+    # The line below is the crucial part, described in the paragraph above!
+    output = tl.where(x_keep, x / (1-p), 0.0)
+    # Write-back output
+    tl.store(output_ptr + offsets, output, mask=mask)
 
+
+def dropout(x, x_keep, p):
+    output = torch.empty_like(x)
+    assert x.is_contiguous()
+    n_elements = x.numel()
+    grid = lambda meta: (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)
+    _dropout[grid](x, x_keep, output, n_elements, p, BLOCK_SIZE=1024)
+    return output
 
 
 if __name__ == "__main__":
     torch.manual_seed(0)
-    x = torch.randn(1024, 4096, device="cuda")  # 2D tensor
+    torch.cuda.empty_cache()
+    x = torch.randn(1024, 512, device="cuda")  # 2D tensor
     device = torch.cuda.current_device()
     properties = driver.active.utils.get_device_properties(device)
     NUM_SM = properties["multiprocessor_count"]
@@ -124,10 +153,19 @@ if __name__ == "__main__":
     target = triton.runtime.driver.active.get_current_target()
     kernels = {}
 
-    torch.cuda.empty_cache()
     y_triton = softmax(x)
     y_torch = torch.softmax(x, dim=-1)
     # assert torch.allclose(y_triton, y_torch), (y_triton, y_torch)
     benchmark.run(show_plots=True, print_data=True)
     print(f"The maximum different between softmax_triton from softmax_naive {torch.max(torch.abs(y_triton - y_torch))}")
 
+    # torch.cuda.empty_cache()
+    # x = torch.randn(size=(10, )).cuda()
+    # p = 0.5
+    # x_keep = (torch.rand(size=(10, )) > p).to(torch.int32).cuda()
+    # output = dropout(x, x_keep=x_keep, p=p)
+    # print(tabulate.tabulate([
+    #     ["input"] + x.tolist(),
+    #     ["keep mask"] + x.tolist(),
+    #     ["output"] + output.tolist()
+    # ]))
