@@ -156,16 +156,16 @@ if __name__ == "__main__":
     y_triton = softmax(x)
     y_torch = torch.softmax(x, dim=-1)
     # assert torch.allclose(y_triton, y_torch), (y_triton, y_torch)
-    benchmark.run(show_plots=True, print_data=True)
+    # benchmark.run(show_plots=True, print_data=True)  # softmax benchmark has been exported as png file.
     print(f"The maximum different between softmax_triton from softmax_naive {torch.max(torch.abs(y_triton - y_torch))}")
 
-    # torch.cuda.empty_cache()
-    # x = torch.randn(size=(10, )).cuda()
-    # p = 0.5
-    # x_keep = (torch.rand(size=(10, )) > p).to(torch.int32).cuda()
-    # output = dropout(x, x_keep=x_keep, p=p)
-    # print(tabulate.tabulate([
-    #     ["input"] + x.tolist(),
-    #     ["keep mask"] + x.tolist(),
-    #     ["output"] + output.tolist()
-    # ]))
+    torch.cuda.empty_cache()
+    x = torch.randn(size=(10, )).cuda()
+    p = 0.5
+    x_keep = (torch.rand(size=(10, )) > p).to(torch.int32).cuda()
+    output = dropout(x, x_keep=x_keep, p=p)
+    print(tabulate.tabulate([
+        ["input"] + x.tolist(),
+        ["keep mask"] + x.tolist(),
+        ["output"] + output.tolist()
+    ]))
