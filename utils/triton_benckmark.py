@@ -110,6 +110,7 @@ def benchmark(M, N, provider):
     gbps = lambda ms: 2 * x.numel() * x.element_size() * 1e-9 / (ms * 1e-3)
     return gbps(ms)
 
+@triton.jit
 def _dropout(
         x_ptr,
         x_keep_ptr,
@@ -123,7 +124,7 @@ def _dropout(
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
     mask = offsets < n_elements
     # load data
-    x = tl.load(x_ptr, offsets, mask=mask)
+    x = tl.load(x_ptr + offsets, mask=mask)
     x_keep = tl.load(x_keep_ptr + offsets, mask=mask)
     # The line below is the crucial part, described in the paragraph above!
     output = tl.where(x_keep, x / (1-p), 0.0)
